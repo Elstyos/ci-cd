@@ -1,0 +1,60 @@
+name: Javascript
+on:
+  workflow_call:
+    inputs:
+      project:
+        required: true
+        type: string
+      environnement:
+        required: false
+        type: string
+        default: Test
+    secrets:
+      host:
+        required: false
+      username:
+        required: false
+      password:
+        required: false
+      port:
+        required: false
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - run: yarn
+        name: Install
+      - run: yarn test
+        name: Test
+        continue-on-error: true
+
+  deploy:
+    name: Deploy on ${{ inputs.environnement }}
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v3
+      - run: yarn
+        name: Install
+      - run: yarn build
+        name: Build
+      - uses: appleboy/scp-action@master
+        name: Upload to VPS
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          source: ./build/*
+          target: artifacts/${{ inputs.project }}
+      - uses: appleboy/ssh-action@master
+        name: Run deploy.sh
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          script: ./deploy.sh ${{ inputs.project }} ${{inputs.environnement == 'Prod'}}
